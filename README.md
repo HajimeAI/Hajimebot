@@ -17,7 +17,7 @@ We can build  AI products on the Hajime Network. Such as building a knowledge sh
 
 
 ## Prerequisites
-- Ubuntu 22.04.4 LTS
+- Ubuntu 22.04 LTS
 - Python 3.10
 - Cuda 12.1
 - GPU, Tested on Nvida RTX 4060、4090、Jetson Orin Nano

@@ -1,0 +1,16 @@
+# Python-created cache files
+**/__pycache__
+
+# VS Code
+**/.vscode
+# JetBrains folder
+.idea/
+
+.venv/
+cache/
+logs/
+/models/
+samples/
+whisper/whisper.dll
+vlc-3.0.20/
+tests/

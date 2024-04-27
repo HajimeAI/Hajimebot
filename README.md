@@ -93,7 +93,7 @@ Hajimebot should be run using GPU for better performance. *The rest of section u
 # get codes from git
 git clone <git-repo-url>
 cd <path-to-node-app>
-mkdir -p cache/speech/record logs/ models/whisper
+mkdir -p cache/speech/record logs/ models/whisper models/fasttext-langdetect
 chmod 755 ./audio_capture.sh ./start.sh
 
 # packages install
@@ -161,11 +161,39 @@ python ./audio_capture.py
 
 ## Starting on boot
 ```
+vim /etc/pulse/client.conf
+
+# set pulse audio not to auto spawn
+default-server = /var/run/pulse/native
+autospawn = no
+```
+
+```
+vim /lib/systemd/system/hjm-pulse.service
+
+[Unit]
+Description=Hajime bot node app pulse audio service
+Requires=sound.target dbus.service
+After=sound.target dbus.service
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/bash /opt/NodeApp/pulse.sh
+Restart=on-failure
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
+
+```
 vim /lib/systemd/system/hjm-main.service
 
 [Unit]
 Description=Hajime bot node app main
-After=network-online.target sound.target
+After=hjm-pulse.service
 [Service]
 User=root
 Type=simple
@@ -204,6 +232,7 @@ WantedBy=graphical.target
 ```
 
 ```
+systemctl enable hjm-pulse.service
 systemctl enable hjm-main.service
 systemctl enable hjm-audio-capture.service
 ```# Hajimebot

@@ -12,18 +12,23 @@ from whisper.audio_recorder import AudioRecorder, pack_audio_chunks, dump_wave_f
 from communication.models import *
 
 _local_ws = None
+
+
 async def send_message_to_local(message):
     global _local_ws
     if not _local_ws:
         return
-    
+
     await _local_ws.send(message)
 
-async def record_pause(req: WsBase, audio_recorder: AudioRecorder):    
+
+async def record_pause(req: WsBase, audio_recorder: AudioRecorder):
     audio_recorder.pause()
 
-async def record_resume(req: WsBase, audio_recorder: AudioRecorder):    
+
+async def record_resume(req: WsBase, audio_recorder: AudioRecorder):
     audio_recorder.resume()
+
 
 action_list = [
     (record_pause, WsBase),
@@ -33,16 +38,17 @@ actions_map = {}
 for x in action_list:
     actions_map[x[0].__name__] = x
 
+
 async def start_local_ws_connection(audio_recorder):
     async for websocket in websockets.connect(
-        "ws://127.0.0.1:5001",
-        max_size=WS_MAX_SIZE,
+            "ws://127.0.0.1:5001",
+            max_size=WS_MAX_SIZE,
     ):
         logger.info('websocket connected.')
         global _local_ws
         _local_ws = websocket
         try:
-            async for message in websocket: 
+            async for message in websocket:
                 logger.info(f"Received local ws message: {message}")
                 event = json.loads(message)
                 reqBase = WsBase.model_validate(event)
@@ -58,6 +64,7 @@ async def start_local_ws_connection(audio_recorder):
             audio_recorder.resume()
             continue
 
+
 def int_to_float(sound):
     _sound = np.copy(sound)
     abs_max = np.abs(_sound).max()
@@ -66,6 +73,7 @@ def int_to_float(sound):
         _sound *= 1 / abs_max
     audio_float32 = torch.from_numpy(_sound.squeeze())
     return audio_float32
+
 
 async def capture_sentences(audio_recorder: AudioRecorder):
     time.sleep(2)
@@ -101,7 +109,7 @@ async def capture_sentences(audio_recorder: AudioRecorder):
             newsound = np.frombuffer(raw_data, np.int16)
             audio_float32 = int_to_float(newsound)
             time_stamps = get_speech_timestamps(
-                audio_float32, 
+                audio_float32,
                 model,
                 min_speech_duration_ms=300,  # min speech duration in ms
                 min_silence_duration_ms=600,  # min silence duration
@@ -111,17 +119,18 @@ async def capture_sentences(audio_recorder: AudioRecorder):
             elasped = time.time() - start_tm
             if len(time_stamps) > 0:
                 logger.info(f"silero VAD has detected a possible speech, elasped: {elasped:.02f}s")
-                dump_wave_file(raw_data, sub_dir='record/')
+                # dump_wave_file(raw_data, sub_dir='record/')
             else:
                 logger.info(f"silero VAD has detected a noise, elasped: {elasped:.02f}s")
                 continue
-            
+
             await send_message_to_local(raw_data)
             sent = True
-        
+
         if sent:
             # pause until recv record_resume message
             audio_recorder.pause()
+
 
 async def main(audio_recorder: AudioRecorder):
     tasks = [
@@ -129,6 +138,7 @@ async def main(audio_recorder: AudioRecorder):
         capture_sentences(audio_recorder),
     ]
     await asyncio.gather(*tasks)
+
 
 if __name__ == '__main__':
     audio_recorder = AudioRecorder()

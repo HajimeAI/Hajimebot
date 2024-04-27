@@ -22,6 +22,8 @@ from whisper.audio_recorder import AudioRecorder
 from communication.manager.solana_util import generate_keypair
 from communication.models import *
 from model_api.cached_conversation import CachedConversation
+from model_api import lang_detect
+
 
 class NodeInfo(BaseModel):
     sol_kp: str
@@ -29,6 +31,7 @@ class NodeInfo(BaseModel):
     ip: Optional[str] = None
     central_id: Optional[int] = None
     kb_type: Optional[int] = None
+
 
 def get_n2n_ip():
     # get edge0 AF_INET
@@ -40,6 +43,7 @@ def get_n2n_ip():
             if str(address.family) == 'AddressFamily.AF_INET':
                 return address.address
     return ''
+
 
 def get_host_ip():
     n2n_ip = get_n2n_ip()
@@ -58,7 +62,8 @@ def get_host_ip():
     except:
         logger.error("Unable to get Hostname and IP")
         return ''
-    
+
+
 def get_size(bytes, suffix="B"):
     """
     Scale bytes to its proper format
@@ -69,12 +74,14 @@ def get_size(bytes, suffix="B"):
             return f"{bytes:.2f}{unit}{suffix}"
         bytes /= factor
 
+
 class NodeStatus(Enum):
     BOOTING = 0,
     BOOTED = 1,
     NETWORK_CONNECTING = 2
     NETWORK_CONNECTED = 3,
     WORKING = 4,
+
 
 class LocalManager():
     def __init__(self):
@@ -100,7 +107,7 @@ class LocalManager():
     @property
     def status(self):
         return self._status
-    
+
     def set_index_types(self, index_types):
         self._index_types = index_types
 
@@ -110,10 +117,14 @@ class LocalManager():
                 return index_type.id
         return self._node_info.kb_type
 
+    def load_models(self):
+        self.load_whisper()
+        lang_detect.load_model()
+
     def load_whisper(self):
         self._whisper = Whisper(
             model_path=WHISPER_MODEL_PATH,
-            # n_threads=4, 
+            # n_threads=4,
             # best_of=2,
             # print_progress=False,
             # print_realtime=False,
@@ -122,9 +133,9 @@ class LocalManager():
 
     def audio_process_commands(self, raw_data: bytes) -> Tuple[str, str]:
         result = self._whisper.handle_command_workflow(
-            raw_data=raw_data, 
+            raw_data=raw_data,
             sample_width=AudioRecorder.WIDTH,
-            lang='auto', 
+            lang='auto',
         )
         if result is None:
             return None
@@ -145,12 +156,12 @@ class LocalManager():
         logger.info(f'node_info: {self._node_info}')
 
         return self._node_info
-    
+
     def init_node_info(self):
         sol_kp = generate_keypair()
         self._node_info = NodeInfo(
-            sol_kp = str(sol_kp),
-            imei = str(sol_kp.pubkey()),
+            sol_kp=str(sol_kp),
+            imei=str(sol_kp.pubkey()),
         )
         with open(NODE_INFO_PATH, 'wb') as fp:
             pickle.dump(self._node_info, fp)
@@ -174,24 +185,24 @@ class LocalManager():
         await self.send_event('model_online', {
             'text': f'Whisper model({WHISPER_MODEL}) loaded.',
         })
-        
+
         logger.info(f'node_info: {self._node_info}')
 
     def get_kb_name(self, kb_type=None):
         if not kb_type:
             kb_type = self._node_info.kb_type
         return f'kb_{kb_type}'
-    
+
     def set_central_ws(self, ws):
         self._central_ws = ws
-    
+
     async def send_message_to_central(self, message):
         if not self._central_ws:
             return
-        
+
         await self._central_ws.send(message)
 
-    async def send_event(self, kind, content):        
+    async def send_event(self, kind, content):
         node_info = self.get_node_info()
         req = EventRequest(
             msgType='event',
@@ -273,7 +284,7 @@ class LocalManager():
             cpu = uname.processor
         else:
             cpu_model = os.popen('lscpu | grep "Model name"').read()
-            cpu = cpu_model[cpu_model.index(':') + 1 : ].strip()
+            cpu = cpu_model[cpu_model.index(':') + 1:].strip()
 
         svmem = psutil.virtual_memory()
         partitions = psutil.disk_partitions()
@@ -291,7 +302,7 @@ class LocalManager():
         hd_pcnt = '0%'
         if hd_total != 0:
             hd_pcnt = f'{(hd_used * 1000) // hd_total / 10}%'
-        
+
         gpus = GPUtil.getGPUs()
         gpu_name = ','.join([x.name for x in gpus])
 
@@ -308,7 +319,7 @@ class LocalManager():
             compute_cap_level=NODE_COMPUTE_CAP_LEVEL,
             compute_cap=NODE_COMPUTE_CAP_INFO.get(f'level_{NODE_COMPUTE_CAP_LEVEL}', {}),
         )
-        
+
         return NodeDetailRequest(
             msgType='node_detail',
             data=data,

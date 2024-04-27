@@ -1,12 +1,12 @@
 PROMPT_TEMPLATES = {
     'chat': 
-        'You are a nice chatbot having a conversation with a human.\n\n'
+        'You are a nice chatbot named "Hajime" having a conversation with a human. Please Reply without emoji.\n\n'
         'Previous conversation:\n'
         '{history}\n\n'
         'New human question: {query}\n'
         'Response:',
-    'kb_chat': 
-        'You are a nice chatbot having a conversation with a human.\n\n'
+    'kb_chat':
+        'You are a nice chatbot named "Hajime" having a conversation with a human. Please Reply without emoji.\n\n'
         # 'Previous conversation:\n'
         # '{history}\n\n'
         'Reference Information:\n'

@@ -5,14 +5,18 @@ from db.models import *
 from configs import logger, NLTK_DATA_PATH, WHISPER_MODEL_PATH
 
 import nltk
+
 nltk.data.path = [NLTK_DATA_PATH] + nltk.data.path
+
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
 
+
 def reset_tables():
     Base.metadata.drop_all(bind=engine)
     create_tables()
+
 
 def test_faiss_cache():
     import time, random
@@ -22,6 +26,7 @@ def test_faiss_cache():
     from knowledge_base.kb_cache.faiss_cache import kb_faiss_pool
 
     kb_names = ["vs1", "vs2", "vs3"]
+
     # for name in kb_names:
     #     memo_faiss_pool.load_vector_store(name)
 
@@ -32,13 +37,13 @@ def test_faiss_cache():
         r = random.randint(1, 3)
 
         with kb_faiss_pool.load_vector_store(vs_name).acquire(name) as vs:
-            if r == 1: # add docs
+            if r == 1:  # add docs
                 ids = vs.add_texts([f"text added by {name}"], embeddings=embeddings)
                 pprint(ids)
-            elif r == 2: # search docs
+            elif r == 2:  # search docs
                 docs = vs.similarity_search_with_score(f"{name}", k=3, score_threshold=1.0)
                 pprint(docs)
-        if r == 3: # delete docs
+        if r == 3:  # delete docs
             logger.warning(f"clear {vs_name} by {name}")
             cache = kb_faiss_pool.get(vs_name);
             if cache:
@@ -54,6 +59,7 @@ def test_faiss_cache():
 
     for t in threads:
         t.join()
+
 
 def test_doc_loaders():
     # from document_loaders.FilteredCSVloader import FilteredCSVLoader
@@ -83,11 +89,12 @@ def test_doc_loaders():
     docs = loader.load()
     logger.info(f'pdf: {docs[0]}')
 
+
 def test_llm():
     from configs import DEFAULT_CHAT_MODEL, ChatModels
     from model_api.cached_conversation import CachedConversation
     conversation = CachedConversation(DEFAULT_CHAT_MODEL)
-    
+
     query = 'Do you know someting about Japan? Could you act as a guide to Japan?'
     logger.info('start simple_chat ...')
     result = conversation.simple_chat(query)
@@ -115,21 +122,22 @@ def test_llm():
     result = conversation.kb_chat(query, reference)
     logger.info(f'kb_chat result: [{result}]')
 
+
 def test_whisper_transcribe():
     from whisper import Whisper
     try:
         whisper = Whisper(
-            model_path=WHISPER_MODEL_PATH, 
-            # n_threads=4, 
+            model_path=WHISPER_MODEL_PATH,
+            # n_threads=4,
             # best_of=2,
             print_progress=False,
             print_realtime=False,
             print_colors=True,
         )
         lang, result, prob, logprob_min, elapsed = whisper.transcribe_wav(
-            # file_path='./cache/speech/record/20240323_193832.wav', 
-            file_path='./samples/jfk.wav', 
-            lang='auto', 
+            # file_path='./cache/speech/record/20240323_193832.wav',
+            file_path='./samples/jfk.wav',
+            lang='auto',
         )
         logger.info(f'lang: {lang}, prob: {prob:.04f}, logprob_min: {logprob_min:.04f}, elapsed {elapsed:.04f} seconds')
         logger.info(f'result: [{result}]')
@@ -137,6 +145,7 @@ def test_whisper_transcribe():
         del whisper
     except Exception as e:
         logger.error(f'whisper error: [{e}]', exc_info=e)
+
 
 def test_whisper_cmd():
     import time
@@ -147,12 +156,12 @@ def test_whisper_cmd():
 
     async def _main():
         await create_const_speech()
-    
+
     try:
         asyncio.run(_main())
         whisper = Whisper(
-            model_path=WHISPER_MODEL_PATH, 
-            # n_threads=4, 
+            model_path=WHISPER_MODEL_PATH,
+            # n_threads=4,
             # best_of=2,
             print_progress=False,
             print_realtime=False,
@@ -171,16 +180,17 @@ def test_whisper_cmd():
 
             for chunks in sentences:
                 raw_data = pack_audio_chunks(chunks)
-        
+
                 whisper.handle_command_workflow(
-                    raw_data=raw_data, 
+                    raw_data=raw_data,
                     sample_width=AudioRecorder.WIDTH,
-                    lang='auto', 
+                    lang='auto',
                 )
 
         del whisper
     except Exception as e:
         logger.error(f'whisper error: [{e}]', exc_info=e)
+
 
 def test_whisper_wav_cmd():
     import time
@@ -189,8 +199,8 @@ def test_whisper_wav_cmd():
     from whisper.audio_recorder import AudioRecorder
 
     whisper = Whisper(
-        model_path=WHISPER_MODEL_PATH, 
-        # n_threads=4, 
+        model_path=WHISPER_MODEL_PATH,
+        # n_threads=4,
         # best_of=2,
         print_progress=False,
         print_realtime=False,
@@ -207,6 +217,7 @@ def test_whisper_wav_cmd():
     pcmf32_cmd = pcmf32_prompt + pcmf32_cmd
     whisper.process_commands(pcmf32_cmd)
 
+
 def test_upload_file():
     from communication.api.kb_doc_api import upload_file
     file_name = 'finite_diff_fomulars.pdf'
@@ -214,23 +225,30 @@ def test_upload_file():
     rsp = upload_file(file_name, kb_name)
     logger.info(f'rsp: {rsp}')
 
+
 def test_tts():
-    from model_api.tts import play_audio_file_in_stream, play_audio_stream
     import asyncio
     import time
-    from configs import DEFAULT_VOICE, DEFAULT_VOICE_LOCAL, USING_LOCAL_TTS
+    from model_api.tts import play_audio_file_in_stream, play_audio_stream
+    from model_api import lang_detect
 
     text = """
-        A native of Oakland, California, the 38-year-old Shanahan is a philanthropist with a long history of donating to Democrat and left-leaning causes, including supporting President Biden in his 2020 election bid before switching to Kennedy when he launched his own run for the Democrat nomination last year.
+        A native of Oakland, California, the 38-year-old Shanahan is a philanthropist with 
+        a long history of donating to Democrat and left-leaning causes, 
+        including supporting President Biden in his 2020 election bid before switching to Kennedy 
+        when he launched his own run for the Democrat nomination last year.
     """
-    voice = DEFAULT_VOICE_LOCAL if USING_LOCAL_TTS else DEFAULT_VOICE
+    text = text.strip().replace("\n", " ")
+    lang_detect.load_model()
+    voice = lang_detect.get_voice_by_lang(text)
+    logger.info(f'voice: {voice}')
 
     async def _async_main():
         # await play_text(text, voice)
         # print('play finished.')
         await play_audio_stream(text, voice)
         # input('press any key...')
-    
+
     asyncio.run(_async_main())
 
     # audio_file_1 = './cache/speech/booted_speech.mp3'
@@ -238,6 +256,7 @@ def test_tts():
     # while True:
     #     play_audio_file_in_stream(audio_file_1)
     #     play_audio_file_in_stream(audio_file_2)
+
 
 def test_edge():
     from model_api.tts import edge_tts_audio_stream
@@ -248,7 +267,7 @@ def test_edge():
     from io import BytesIO
 
     voice = DEFAULT_VOICE
-    
+
     async def _async_main():
         first_max_tm = 0
         first_min_tm = 0
@@ -274,7 +293,8 @@ def test_edge():
                             first_min_tm = elaspsed_tm
                         if elaspsed_tm > first_max_tm:
                             first_max_tm = elaspsed_tm
-                        logger.info(f'got_first_chunk, elaspsed_tm({elaspsed_tm:.02f}s), first_min_tm({first_min_tm:.2f}s), first_max_tm({first_max_tm:.2f}s)')
+                        logger.info(
+                            f'got_first_chunk, elaspsed_tm({elaspsed_tm:.02f}s), first_min_tm({first_min_tm:.2f}s), first_max_tm({first_max_tm:.2f}s)')
                         got_first_chunk = True
                     audio_len += len(audio_data)
                     bio.write(audio_data)
@@ -282,16 +302,17 @@ def test_edge():
                         dump_file_path = f'./cache/{int(time.time())}.audio'
                         with open(dump_file_path, 'wb') as fp:
                             fp.write(bio.getvalue())
-            
+
             elaspsed_tm = time.time() - start_tm
             if elaspsed_tm < min_tm or min_tm <= 0:
                 min_tm = elaspsed_tm
             if elaspsed_tm > max_tm:
                 max_tm = elaspsed_tm
-            logger.info(f'audio_len: {audio_len}, elaspsed_tm({elaspsed_tm:.02f}s), min_tm({min_tm:.2f}s), max_tm({max_tm:.2f}s)')
+            logger.info(
+                f'audio_len: {audio_len}, elaspsed_tm({elaspsed_tm:.02f}s), min_tm({min_tm:.2f}s), max_tm({max_tm:.2f}s)')
 
             time.sleep(3)
-    
+
     asyncio.run(_async_main())
 
 
@@ -304,7 +325,7 @@ def test_simple_vad():
     from typing import List
 
     from whisper.utils import high_pass_filter
-    
+
     sample_rate = 16000
     sample_width = 2
 
@@ -315,15 +336,16 @@ def test_simple_vad():
             if params.nchannels != 1 and params.nchannels != 2:
                 raise Exception(f"WAV file '{file_path}' must be mono or stereo")
             if params.framerate != sample_rate:
-                raise Exception(f"WAV file '{file_path}' must be {sample_rate/1000} kHz")
+                raise Exception(f"WAV file '{file_path}' must be {sample_rate / 1000} kHz")
             if params.sampwidth != sample_width:
                 raise Exception(f"WAV file '{file_path}' must be 16-bit")
-            
+
             bs = wavfile.readframes(params.nframes)
-            logger.info(f'{params}, readframes: {len(bs)}')           
+            logger.info(f'{params}, readframes: {len(bs)}')
 
             with BytesIO(bs) as bio:
-                frames_org = [int.from_bytes(bio.read(2), byteorder='little', signed=True) for _ in range(params.nframes * params.nchannels)]
+                frames_org = [int.from_bytes(bio.read(2), byteorder='little', signed=True) for _ in
+                              range(params.nframes * params.nchannels)]
 
                 mx_sp = max(abs(i) for i in frames_org)
                 MAXIMUM = 32767
@@ -335,31 +357,31 @@ def test_simple_vad():
                 # frames = frames_normal
 
                 if params.nchannels == 1:
-                    pcmf32 = [ float(frames[x]) / 32768.0 for x in range(params.nframes) ]
+                    pcmf32 = [float(frames[x]) / 32768.0 for x in range(params.nframes)]
                 else:
-                    pcmf32 = [ float(frames[2*x] + frames[2*x+1]) / 65536.0 for x in range(params.nframes) ]
+                    pcmf32 = [float(frames[2 * x] + frames[2 * x + 1]) / 65536.0 for x in range(params.nframes)]
 
             wave_data_org = np.array(frames_org)
             wave_data_normal = np.array(frames_normal)
             wave_time = np.arange(0, params.nframes) * (1.0 / params.framerate)
 
             return pcmf32, wave_data_org, wave_data_normal, wave_time
-        
+
     def _vad_simple(pcmf32: List[float], sample_rate: int, last_ms: int, freq_thold: float):
         n_samples = len(pcmf32)
         n_samples_last = (sample_rate * last_ms) // 1000
-        
+
         energy_all_tt = 0.0
         energy_last_tt = 0.0
         for i in range(n_samples):
             energy_all_tt += abs(pcmf32[i])
             if i >= n_samples - n_samples_last:
                 energy_last_tt += abs(pcmf32[i])
-        
+
         if freq_thold > 0.0:
             high_pass_filter(pcmf32, freq_thold, sample_rate)
-        
-        energy_all  = 0.0
+
+        energy_all = 0.0
         energy_last = 0.0
 
         for i in range(n_samples):
@@ -367,14 +389,14 @@ def test_simple_vad():
             if i >= n_samples - n_samples_last:
                 energy_last += abs(pcmf32[i])
 
-        energy_all  /= n_samples
+        energy_all /= n_samples
         energy_last /= n_samples_last
 
         if energy_all <= 0:
             return 1
-        
+
         return energy_last / energy_all
-    
+
     file_path = './test.wav'
     pcmf32, wave_data_org, wave_data_normal, wave_time = _read_wav(file_path)
     total_samples = len(pcmf32)
@@ -389,12 +411,12 @@ def test_simple_vad():
     if total_samples <= window_sz:
         ratio = _vad_simple(
             pcmf32,
-            sample_rate=sample_rate, 
-            last_ms=last_ms, 
-            freq_thold=freq_thold, 
+            sample_rate=sample_rate,
+            last_ms=last_ms,
+            freq_thold=freq_thold,
         )
         ratio_arr = np.linspace(1, ratio, len(wave_time))
-        
+
     else:
         ratio_bounds = []
         pcmf32_len = len(pcmf32)
@@ -404,33 +426,33 @@ def test_simple_vad():
         for i in range(0, total_samples - window_sz, chunk_sz):
             stop_idx = i + window_sz
             ratio = _vad_simple(
-                pcmf32[i : i + window_sz],
-                sample_rate=sample_rate, 
-                last_ms=last_ms, 
-                freq_thold=freq_thold, 
+                pcmf32[i: i + window_sz],
+                sample_rate=sample_rate,
+                last_ms=last_ms,
+                freq_thold=freq_thold,
             )
             ratio_bounds.append((start_idx, stop_idx, last_ratio, ratio))
             last_ratio = ratio
             start_idx = stop_idx
-        
+
         ratio_chunks = []
         for x in ratio_bounds:
             ratio_chunks.append(np.linspace(x[2], x[3], x[1] - x[0]))
-        
+
         if stop_idx < pcmf32_len:
             ratio = _vad_simple(
                 pcmf32[-window_sz:],
-                sample_rate=sample_rate, 
-                last_ms=last_ms, 
-                freq_thold=freq_thold, 
+                sample_rate=sample_rate,
+                last_ms=last_ms,
+                freq_thold=freq_thold,
             )
             ratio_chunks.append(np.linspace(last_ratio, ratio, pcmf32_len - stop_idx))
-        
+
         # print(len(ratio_chunks))
         ratio_arr = np.concatenate(ratio_chunks)
         # print(len(ratio_arr))
         # print(len(wave_time))
-    
+
     vad_thold_arr = [vad_thold] * len(wave_time)
 
     fig = plt.figure(figsize=(10, 8), dpi=100)
@@ -449,6 +471,21 @@ def test_simple_vad():
     axes3.set_xlabel(f'time(seconds), vad_thold({vad_thold}), time_window_ms({time_window_ms})')
 
     plt.show()
+
+
+def test_lang_detect():
+    from model_api import lang_detect
+    lang_detect.load_model(low_memory=False)
+
+    result = lang_detect.text_detect(text="户外运动包括了水上、航空、登山、冰雪、汽摩等多种运动类型。")
+    print(result)
+
+    result = lang_detect.text_detect(text="Load model from Google Cloud Storage without downloading.")
+    print(result)
+
+    result = lang_detect.text_detect(text="驚いた彼は道を走っていった。")
+    print(result)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Node application commands.")
@@ -523,6 +560,11 @@ if __name__ == "__main__":
         action="store_true",
         help=("test vad.")
     )
+    parser.add_argument(
+        "--test-lang-detect",
+        action="store_true",
+        help=("test lang detect.")
+    )
 
     args = parser.parse_args()
 
@@ -544,9 +586,11 @@ if __name__ == "__main__":
         test_whisper_wav_cmd()
     elif args.load_node_info:
         from communication.manager.local_manager import g_local_manager
+
         g_local_manager.load_node_info()
     elif args.test_solana:
         from communication.manager.solana_util import generate_keypair, restore_keypair
+
         kp = generate_keypair()
         print(f'kp: {kp}')
         print(f'pubkey: {str(kp.pubkey())}')
@@ -566,4 +610,6 @@ if __name__ == "__main__":
         test_edge()
     elif args.test_vad:
         test_simple_vad()
+    elif args.test_lang_detect:
+        test_lang_detect()
 

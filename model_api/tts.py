@@ -1,7 +1,7 @@
 import os
 import time
 import asyncio
-import aiohttp        
+import aiohttp
 import aiofiles
 import requests
 import websockets
@@ -17,14 +17,15 @@ import shlex
 import wave
 
 from configs import (
-    logger, SPEECH_DIR, DEFAULT_VOICE, DEFAULT_VOICE_LOCAL,
+    logger, SPEECH_DIR, DEFAULT_VOICE, DEFAULT_VOICE_LOCAL_MAP,
     CONST_SPEECH_MAP, LOCAL_TTS_SERVER, USING_LOCAL_TTS, AUDIO_FILE_SUFFIX,
 )
+
 
 # Override microsoft edge-tts Communicate class, otherwise aiohttp websocket connecting is too slow
 class CommunicateEx(edge_tts.Communicate):
     def __init__(
-        self, *args, **kwargs
+            self, *args, **kwargs
     ):
         super().__init__(*args, **kwargs)
 
@@ -111,17 +112,17 @@ class CommunicateEx(edge_tts.Communicate):
             ssl_ctx = ssl.create_default_context(cafile=certifi.where())
             try:
                 async with websockets.connect(
-                    f"{edge_tts.constants.WSS_URL}&ConnectionId={edge_tts.communicate.connect_id()}",
-                    extra_headers={
-                        "Pragma": "no-cache",
-                        "Cache-Control": "no-cache",
-                        "Origin": "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
-                        "Accept-Encoding": "gzip, deflate, br",
-                        "Accept-Language": "en-US,en;q=0.9",
-                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                        " (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36 Edg/91.0.864.41",
-                    },
-                    ssl=ssl_ctx,
+                        f"{edge_tts.constants.WSS_URL}&ConnectionId={edge_tts.communicate.connect_id()}",
+                        extra_headers={
+                            "Pragma": "no-cache",
+                            "Cache-Control": "no-cache",
+                            "Origin": "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
+                            "Accept-Encoding": "gzip, deflate, br",
+                            "Accept-Language": "en-US,en;q=0.9",
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                                          " (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36 Edg/91.0.864.41",
+                        },
+                        ssl=ssl_ctx,
                 ) as websocket:
                     try:
                         logger.info('Edge-TTS websockets connected.')
@@ -139,6 +140,7 @@ class CommunicateEx(edge_tts.Communicate):
                         await send_ssml_request()
 
                         logger.info('Edge-TTS start to receive messages ...')
+                        got_first_chunk = False
                         async for received in websocket:
                             if type(received) == str:
                                 parameters, data = edge_tts.communicate.get_headers_and_data(received)
@@ -150,7 +152,7 @@ class CommunicateEx(edge_tts.Communicate):
 
                                     # Update the last duration offset for use by the next SSML request.
                                     last_duration_offset = (
-                                        parsed_metadata["offset"] + parsed_metadata["duration"]
+                                            parsed_metadata["offset"] + parsed_metadata["duration"]
                                     )
                                 elif path == b"turn.end":
                                     # Update the offset compensation for the next SSML request.
@@ -185,10 +187,14 @@ class CommunicateEx(edge_tts.Communicate):
                                         "We received a binary message, but it is missing the audio data."
                                     )
 
+                                if not got_first_chunk:
+                                    logger.info(f'edge-tts stream got first chunk')
+                                    got_first_chunk = True
+
                                 audio_was_received = True
                                 yield {
                                     "type": "audio",
-                                    "data": received[header_length + 2 :],
+                                    "data": received[header_length + 2:],
                                 }
 
                         if not audio_was_received:
@@ -203,9 +209,11 @@ class CommunicateEx(edge_tts.Communicate):
                 logger.info(f'edge-tts websocket connect error: {e}, reconnect...')
                 continue
 
+
 RATE = "+0%"
 VOLUMN = "+0%"
 PITCH = "+0Hz"
+
 
 async def create_audio_file(text, voice, output_file):
     if USING_LOCAL_TTS:
@@ -219,14 +227,17 @@ async def create_audio_file(text, voice, output_file):
         communicate = CommunicateEx(text, voice, rate=RATE, volume=VOLUMN, pitch=PITCH)
         await communicate.save(output_file)
 
+
 async def edge_tts_audio_stream(text, voice):
     communicate = CommunicateEx(text, voice, rate=RATE, volume=VOLUMN, pitch=PITCH)
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
             yield chunk["data"]
 
+
 async def local_tts_audio_stream(text, voice):
     urlencoded_text = requests.utils.quote(text)
+    got_first_chunk = False
     async with aiohttp.ClientSession() as session:
         payload = {
             "cha_name": voice,
@@ -246,10 +257,14 @@ async def local_tts_audio_stream(text, voice):
         async with session.post(LOCAL_TTS_SERVER, json=payload) as resp:
             if resp.status == 200:
                 async for data in resp.content.iter_chunked(1024):
+                    if not got_first_chunk:
+                        logger.info(f'local_tts_audio_stream got first chunk')
+                        got_first_chunk = True
                     yield data
             else:
                 content = await resp.text()
                 logger.error(f'connect to {LOCAL_TTS_SERVER} fail: {content}')
+
 
 async def play_audio_stream(text, voice):
     ffplay_process = "ffplay -autoexit -nodisp -i pipe:0"
@@ -263,10 +278,11 @@ async def play_audio_stream(text, voice):
     async for audio_data in async_audio_stream(text, voice):
         # 将二进制MP3声音数据传送到ffplay进行播放
         player.stdin.write(audio_data)
-    
+
     player.stdin.close()
     await asyncio.to_thread(player.wait)
     logger.info('play_audio_stream done')
+
 
 def play_audio_file_in_stream(file_path, block=True):
     logger.info(f'play_audio_file_in_stream: {file_path}')
@@ -280,19 +296,22 @@ def play_audio_file_in_stream(file_path, block=True):
             if not data:
                 break
             player.stdin.write(data)
-    
+
     player.stdin.close()
     if block:
         player.wait()
+
 
 def play_audio(output_file, block=True):
     logger.info(f'play_audio: {output_file}')
     playsound.playsound(output_file, block=block)
 
+
 async def text_to_audio(text, voice):
     output_file = os.path.join(SPEECH_DIR, f'{int(time.time())}.{AUDIO_FILE_SUFFIX}')
     await create_audio_file(text, voice, output_file)
     return output_file
+
 
 async def async_play_audio(output_file, block=True):
     if block:
@@ -300,16 +319,19 @@ async def async_play_audio(output_file, block=True):
     else:
         play_audio(output_file, block=block)
 
+
 async def play_text(text, voice, block=True):
     output_file = await text_to_audio(text, voice)
     await async_play_audio(output_file, block=block)
 
+
 async def create_const_speech():
-    voice = DEFAULT_VOICE_LOCAL if USING_LOCAL_TTS else DEFAULT_VOICE
+    voice = DEFAULT_VOICE_LOCAL_MAP['en'] if USING_LOCAL_TTS else DEFAULT_VOICE
     for x in CONST_SPEECH_MAP.values():
         if os.path.exists(x['file']):
             continue
         await create_audio_file(x['txt'], voice, x['file'])
+
 
 def play_const_audio(key: str, block=True):
     if key not in CONST_SPEECH_MAP:

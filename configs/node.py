@@ -34,8 +34,8 @@ NODE_INFO_PATH = os.path.join(KB_ROOT_PATH, 'node_info.pickle')
 
 # Central server URL
 CENTRAL_SERVER_HOST = '18.181.169.40'
-CENTRAL_SERVER_WS_URL = f'ws://{CENTRAL_SERVER_HOST}/ws/instance'
-CENTRAL_SERVER_DOWNLOAD_URL = f'http://{CENTRAL_SERVER_HOST}/download'
+CENTRAL_SERVER_WS_URL = f'wss://{CENTRAL_SERVER_HOST}/ws/instance'
+CENTRAL_SERVER_DOWNLOAD_URL = f'https://{CENTRAL_SERVER_HOST}/download'
 # CENTRAL_SERVER_PROXIES = {
 #     "http": "http://127.0.0.1:8118",
 #     "https": "https://127.0.0.1:8118",
@@ -51,7 +51,12 @@ SPEECH_DIR = os.path.join(KB_ROOT_PATH, "speech")
 # local tts
 USING_LOCAL_TTS = False
 LOCAL_TTS_SERVER = 'http://127.0.0.1:5000/tts'
-DEFAULT_VOICE_LOCAL = '阮•梅'
+DEFAULT_VOICE_LOCAL_MAP = {
+    'default': 'Emma',
+    'en': 'Emma',
+    'zh': 'Emma_zh',
+    'ja': 'Emma_ja',
+}
 
 # const speech
 SPEECH_DELAY_SECONDS = 5
@@ -95,7 +100,7 @@ INDEX_TYPE_SELECTION = 'solana'
 
 # local llm
 LOCAL_LLM_SERVER = 'http://10.10.10.12:11434'
-LOCAL_LLM_MODEL = 'gemma:7b' # llama2:13b
+LOCAL_LLM_MODEL = 'llama3' # llama3, llama2:13b, gemma:7b
 
 class ChatModels(Enum):
     OPENAI = 0,

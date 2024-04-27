@@ -12,38 +12,50 @@ from communication.manager.local_manager import g_local_manager
 from communication.server_manager import g_server_manager
 
 import nltk
+
 nltk.data.path = [NLTK_DATA_PATH] + nltk.data.path
+
 
 async def search_docs_from_kb(req: SearchDocsFromKBRequest):
     return await api.search_docs_from_kb(req)
 
+
 async def list_kbs(req: WsBase):
     return await asyncio.to_thread(api.list_kbs, req)
+
 
 async def create_kb(req: KBCreateRequest):
     return await asyncio.to_thread(api.create_kb, req)
 
+
 async def delete_kb(req: KBDeleteRequest):
     return await asyncio.to_thread(api.delete_kb, req)
+
 
 async def update_info(req: KBUpdateInfoRequest):
     return await asyncio.to_thread(api.update_info, req)
 
+
 async def list_files(req: KBListFilesRequest):
     return await asyncio.to_thread(api.list_files, req)
+
 
 async def update_docs(req: KBUpdateDocsRequest):
     return await asyncio.to_thread(api.update_docs, req)
 
+
 async def delete_docs(req: KBDeleteDocsRequest):
     return await asyncio.to_thread(api.delete_docs, req)
+
 
 async def recreate_vector_store(req: KBRecreateVectorStoreRequest):
     for result in api.recreate_vector_store(req):
         yield result
 
+
 async def search_docs(req: KBSearchDocsRequest):
     return await asyncio.to_thread(api.search_docs, req)
+
 
 action_list = [
     (search_docs_from_kb, SearchDocsFromKBRequest),
@@ -60,6 +72,7 @@ action_list = [
 actions_map = {}
 for x in action_list:
     actions_map[x[0].__name__] = x
+
 
 async def on_connected(websocket: websockets.WebSocketServerProtocol):
     try:
@@ -96,7 +109,7 @@ async def on_connected(websocket: websockets.WebSocketServerProtocol):
                     async for result in gen:
                         await websocket.send(
                             result.model_dump_json(exclude_none=True)
-                        ) 
+                        )
                 else:
                     result = await func(req.model_validate(event))
                     if result:
@@ -104,33 +117,37 @@ async def on_connected(websocket: websockets.WebSocketServerProtocol):
                             result.model_dump_json(exclude_none=True)
                         )
             except Exception as error:
-                logger.error(f"Message handle error: {error}",  exc_info=error)
+                logger.error(f"Message handle error: {error}", exc_info=error)
     finally:
         # Remove connection
         g_local_manager.rmv_ws(websocket)
-        
+
         # Broacast to other connections
 
+
 async def local_ws_server():
-    g_local_manager.load_whisper()
+    g_local_manager.load_models()
 
     server = await websockets.serve(
-        on_connected, 
-        "0.0.0.0", 5001, 
-        max_size=WS_MAX_SIZE, 
+        on_connected,
+        "0.0.0.0", 5001,
+        max_size=WS_MAX_SIZE,
         start_serving=True,
     )
     g_server_manager.reg_ws_server(server)
     # await server.start_serving()
     await server.wait_closed()
-        # await asyncio.Future()  # run forever
+    # await asyncio.Future()  # run forever
     logger.info('local_ws_server exit')
+
 
 app = FastAPI()
 
+
 @app.post("/api/download_doc")
-async def api_download_doc(body: KBDownloadDocRequest): 
+async def api_download_doc(body: KBDownloadDocRequest):
     return api.download_doc(body)
+
 
 async def local_restful_server():
     config = uvicorn.Config("communication.local:app", host='0.0.0.0', port=5002, log_level="info")

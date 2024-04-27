@@ -1,24 +1,26 @@
 import asyncio
 import time
 
-from configs import logger, USING_LOCAL_TTS, DEFAULT_VOICE, DEFAULT_VOICE_LOCAL
+from configs import logger
 from whisper.audio_recorder import dump_wave_file
 from communication.manager.local_manager import g_local_manager
 from communication.server_manager import g_server_manager
 from communication.api.kb_doc_api import search_docs
 from communication.models import *
 from model_api.tts import play_audio_stream
+from model_api.lang_detect import get_voice_by_lang
+
 
 async def audio_handle(raw_data: bytes):
     start_tm = time.perf_counter()
-    
+
     logger.info(f'audio_handle, data len: {len(raw_data)}')
     # dump_wave_file(raw_data)
 
     result = await asyncio.to_thread(g_local_manager.audio_process_commands, raw_data)
     if result is None:
         return
-    
+
     lang, transcribe_result = result
     available_langs = {'en', 'ja', 'zh'}
     if lang not in available_langs:
@@ -27,7 +29,7 @@ async def audio_handle(raw_data: bytes):
     if not transcribe_result:
         logger.info('Got blank audio, ignored.')
         return
-    
+
     g_server_manager.put_event('asr', {
         'text': transcribe_result,
     })
@@ -53,16 +55,18 @@ async def audio_handle(raw_data: bytes):
     elapsed = time.perf_counter() - start_tm
     logger.info(f'Before audio playing, elapsed: {elapsed}')
 
-    voice = DEFAULT_VOICE_LOCAL if USING_LOCAL_TTS else DEFAULT_VOICE
+    llm_result_on_line = llm_result.strip().replace("\n", " ")
+    voice = get_voice_by_lang(llm_result_on_line)
     await play_audio_stream(llm_result, voice)
 
     g_server_manager.put_event('tts', {
         'text': 'tts success',
     })
 
+
 async def search_docs_from_kb(req: SearchDocsFromKBRequest) -> WsResponse:
     node_info = g_local_manager.get_node_info()
-    
+
     if node_info.kb_type == req.kb_type:
         g_server_manager.put_event('query_vector_db', {
             'from_node': node_info.imei,
@@ -102,7 +106,7 @@ async def search_docs_from_kb(req: SearchDocsFromKBRequest) -> WsResponse:
                 action=req.action,
                 data=[],
             )
-        
+
         logger.info(f'Got remote query_node: {query_node}')
         g_server_manager.put_event('query_vector_db', {
             'from_node': node_info.imei,
@@ -116,7 +120,8 @@ async def search_docs_from_kb(req: SearchDocsFromKBRequest) -> WsResponse:
             query_node=query_node,
         )
 
-        await g_local_manager.send_log(f'search_docs from remote({query_node}) success: type({req.kb_type}), query({req.query})')
+        await g_local_manager.send_log(
+            f'search_docs from remote({query_node}) success: type({req.kb_type}), query({req.query})')
 
         return WsResponse(
             action=req.action,
